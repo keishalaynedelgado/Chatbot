@@ -60,6 +60,18 @@ Maintain a polite, competent, and confident tone.`,
 
   STARTER_PROMPTS: [
     {
+      title: "Engineering Team Directory",
+      desc: "Query live Supabase database for engineering staff & roles",
+      prompt: "Show me all employees in the Engineering department and their salaries from the database.",
+      icon: "badge"
+    },
+    {
+      title: "Top Earners & Executives",
+      desc: "List the highest paid staff and leadership positions",
+      prompt: "Who are the top 5 highest-paid employees in our company and what are their roles?",
+      icon: "payments"
+    },
+    {
       title: "Q3 Financial Summary",
       desc: "Generate an executive financial performance breakdown",
       prompt: "Can you generate a summary of the Q3 financial report?",
@@ -70,18 +82,6 @@ Maintain a polite, competent, and confident tone.`,
       desc: "Extract key action items and team milestones",
       prompt: "What are the key takeaways from the meeting?",
       icon: "groups"
-    },
-    {
-      title: "Code Architecture",
-      desc: "Draft an asynchronous API streaming client in JavaScript",
-      prompt: "Write a JavaScript function to stream tokens from an AI API endpoint.",
-      icon: "code"
-    },
-    {
-      title: "Product Roadmap",
-      desc: "Outline Q4 deliverables and risk mitigation strategies",
-      prompt: "Help me outline the product roadmap for Q4 deliverables.",
-      icon: "timeline"
     }
   ],
 

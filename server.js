@@ -10,6 +10,45 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dxvwyapqtokxenyiliwy.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_1yPDpLFJgcPu8vd6dy4l-w_xUUKwCrY';
+
+// Cache for Supabase data to optimize speed
+let employeesCache = null;
+let lastCacheTime = 0;
+const CACHE_TTL = 30000; // 30 seconds
+
+/**
+ * Fetch live employee records from Supabase
+ */
+async function fetchSupabaseEmployees() {
+  const now = Date.now();
+  if (employeesCache && (now - lastCacheTime < CACHE_TTL)) {
+    return employeesCache;
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/employees?select=*`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        employeesCache = data;
+        lastCacheTime = now;
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('[Supabase Fetch Error]:', err.message);
+  }
+  return employeesCache || [];
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   const nvidiaKey = process.env.NVIDIA_API_KEY || (process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
@@ -19,7 +58,8 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     nvidiaConfigured: Boolean(nvidiaKey),
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
-    openaiConfigured: Boolean(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('nvapi-'))
+    openaiConfigured: Boolean(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('nvapi-')),
+    supabaseConfigured: Boolean(SUPABASE_URL && SUPABASE_KEY)
   });
 });
 
@@ -47,6 +87,24 @@ app.post('/api/chat/stream', async (req, res) => {
     const openaiKey = (!rawKey.startsWith('nvapi-') ? rawKey : null) || 
                       (!process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
 
+    // Fetch live Supabase records to ground responses with 100% accurate data
+    let enrichedSystemPrompt = systemInstruction || 'You are Synthie AI, an intelligent, professional, and helpful enterprise AI assistant.';
+    const employees = await fetchSupabaseEmployees();
+    if (employees && employees.length > 0) {
+      const summaryList = employees.map(e => 
+        `- ${e.first_name} ${e.last_name} | Role: ${e.position} | Dept: ${e.department} | Salary: $${Number(e.salary).toLocaleString()} | Location: ${e.location} | Status: ${e.status} | Email: ${e.email}`
+      ).join('\n');
+
+      enrichedSystemPrompt += `\n\n### LIVE SUPABASE DATABASE CONTEXT (Table: public.employees, Total: ${employees.length} records):
+${summaryList}
+
+INSTRUCTIONS FOR SUPABASE DATABASE QUERIES:
+- You have direct live access to the Supabase employee database above.
+- When the user asks about employees, team members, departments, salaries, compensation, locations, or specific staff members (e.g. Sophia Chen, Alexander Wright, Elena Rostova, etc.), use the exact facts and figures from this database.
+- Present answers in clean, professional Markdown tables or bulleted lists.
+- If asked about statistics (e.g. total headcount, average salary, highest paid, counts per department), compute them accurately from this data.`;
+    }
+
     // 1. NVIDIA NIM Provider
     if (provider !== 'builtin' && (provider === 'nvidia' || (nvidiaKey && (!geminiKey && !openaiKey || provider === 'auto' || model?.includes('/') || rawKey.startsWith('nvapi-'))))) {
       const selectedModel = (model && model.includes('/')) ? model : 'meta/llama-3.1-8b-instruct';
@@ -62,7 +120,7 @@ app.post('/api/chat/stream', async (req, res) => {
         body: JSON.stringify({
           model: selectedModel,
           messages: [
-            ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+            { role: 'system', content: enrichedSystemPrompt },
             ...messages
           ],
           temperature: Number(temperature) || 0.7,
@@ -125,17 +183,14 @@ app.post('/api/chat/stream', async (req, res) => {
 
       const bodyPayload = {
         contents,
+        systemInstruction: {
+          parts: [{ text: enrichedSystemPrompt }]
+        },
         generationConfig: {
           temperature: Number(temperature) || 0.7,
           maxOutputTokens: 2048,
         }
       };
-
-      if (systemInstruction) {
-        bodyPayload.systemInstruction = {
-          parts: [{ text: systemInstruction }]
-        };
-      }
 
       const response = await fetch(url, {
         method: 'POST',
@@ -194,7 +249,7 @@ app.post('/api/chat/stream', async (req, res) => {
         body: JSON.stringify({
           model: selectedModel,
           messages: [
-            ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+            { role: 'system', content: enrichedSystemPrompt },
             ...messages
           ],
           temperature: Number(temperature) || 0.7,
@@ -225,7 +280,6 @@ app.post('/api/chat/stream', async (req, res) => {
           if (trimmed.startsWith('data: ')) {
             const dataStr = trimmed.substring(6).trim();
             if (dataStr === '[DONE]') {
-              sendEvent({ done: true });
               continue;
             }
             try {
@@ -246,7 +300,7 @@ app.post('/api/chat/stream', async (req, res) => {
 
     // 4. Fallback: Builtin smart assistant stream
     const lastMsg = messages[messages.length - 1]?.content || '';
-    const reply = generateBuiltinReply(lastMsg);
+    const reply = generateBuiltinReply(lastMsg, employees);
 
     const tokens = reply.match(/(\S+\s*|\n+)/g) || [reply];
     for (const token of tokens) {
@@ -263,8 +317,20 @@ app.post('/api/chat/stream', async (req, res) => {
   }
 });
 
-function generateBuiltinReply(prompt) {
+function generateBuiltinReply(prompt, employees = []) {
   const p = prompt.toLowerCase();
+
+  if ((p.includes('employee') || p.includes('staff') || p.includes('database') || p.includes('engineering') || p.includes('salary')) && employees.length > 0) {
+    let filtered = employees;
+    if (p.includes('engineering')) filtered = employees.filter(e => e.department.toLowerCase() === 'engineering');
+    if (p.includes('design')) filtered = employees.filter(e => e.department.toLowerCase() === 'design');
+    if (p.includes('finance')) filtered = employees.filter(e => e.department.toLowerCase() === 'finance');
+    if (p.includes('marketing')) filtered = employees.filter(e => e.department.toLowerCase() === 'marketing');
+
+    const rows = filtered.map(e => `| ${e.first_name} ${e.last_name} | ${e.position} | ${e.department} | $${Number(e.salary).toLocaleString()} | ${e.location} | ${e.status} |`).join('\n');
+    return `### **Live Supabase Employee Directory**\n\nFound **${filtered.length}** records in the database:\n\n| Name | Position | Department | Salary | Location | Status |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n${rows}\n\n*Data fetched live from Supabase \`public.employees\` table.*`;
+  }
+
   if (p.includes('q3') || p.includes('financial') || p.includes('report')) {
     return `### **Q3 Financial Performance Summary**
 
@@ -324,13 +390,13 @@ async function streamAIResponse(prompt) {
 Let me know if you would like me to customize this further!`;
   }
 
-  return `I'm **Synthie AI**, your intelligent corporate and technical assistant. 
+  return `I'm **Synthie AI**, your intelligent corporate and technical assistant with direct access to your **Supabase Database**.
 
 I can assist you with:
+- **Live Database Queries**: Ask about employees, salaries, departments, and roles in Supabase.
 - **Financial & Data Analysis**: Summarizing reports, quarterly trends, and KPIs.
 - **Meeting Synthesis**: Extracting action items and key decisions.
 - **Code & Architecture**: Designing clean software components and debugging issues.
-- **Customer & Workflow Automation**: Drafting policies, support guidelines, and technical briefs.
 
 How can I help you today?`;
 }
