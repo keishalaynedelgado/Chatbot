@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Synthie AI - Chat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#351000",
+                    "on-primary-fixed": "#0f0069",
+                    "surface-container-high": "#dce9ff",
+                    "on-primary": "#ffffff",
+                    "secondary-fixed-dim": "#c0c1ff",
+                    "secondary-container": "#6063ee",
+                    "surface-tint": "#544fc0",
+                    "background": "#f8f9ff",
+                    "surface-bright": "#f8f9ff",
+                    "surface": "#f8f9ff",
+                    "on-error-container": "#93000a",
+                    "tertiary-fixed-dim": "#ffb694",
+                    "tertiary-container": "#752c00",
+                    "primary-fixed": "#e2dfff",
+                    "surface-dim": "#ccdbf3",
+                    "inverse-surface": "#233144",
+                    "inverse-primary": "#c3c0ff",
+                    "on-background": "#0d1c2e",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface-variant": "#464553",
+                    "secondary": "#4648d4",
+                    "tertiary-fixed": "#ffdbcc",
+                    "primary-container": "#3730a3",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed-variant": "#3b35a7",
+                    "primary": "#1f108e",
+                    "on-surface": "#0d1c2e",
+                    "surface-container-low": "#eff4ff",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-container": "#fe9562",
+                    "error-container": "#ffdad6",
+                    "inverse-on-surface": "#eaf1ff",
+                    "surface-container-highest": "#d5e3fc",
+                    "on-tertiary-fixed-variant": "#7a3003",
+                    "outline": "#777584",
+                    "on-primary-container": "#a9a7ff",
+                    "on-secondary-fixed": "#07006c",
+                    "on-secondary-fixed-variant": "#2f2ebe",
+                    "secondary-fixed": "#e1e0ff",
+                    "on-error": "#ffffff",
+                    "outline-variant": "#c8c4d5",
+                    "tertiary": "#511c00",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "surface-variant": "#d5e3fc",
+                    "surface-container": "#e6eeff",
+                    "on-secondary-container": "#fffbff",
+                    "on-tertiary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "edge-margin-mobile": "1rem",
+                    "container-max": "800px",
+                    "section-margin": "2rem",
+                    "edge-margin-desktop": "2rem",
+                    "stack-gap": "1.5rem",
+                    "bubble-padding": "1rem 1.25rem"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "label-md": ["Inter"],
+                    "mono-streaming": ["JetBrains Mono"],
+                    "headline-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "mono-streaming": ["15px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .typing-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background-color: theme('colors.primary');
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-background dark:bg-background docked full-width top-0 bg-background dark:bg-background flat no shadows flex justify-between items-center h-16 px-edge-margin-mobile md:px-edge-margin-desktop w-full border-b border-outline-variant dark:border-outline z-50 fixed">
+<div class="font-headline-md text-headline-md font-semibold text-primary dark:text-primary-fixed-dim">
+            Synthie
+        </div>
+<div class="hidden">search_bar</div>
+<div class="flex items-center">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors rounded-full p-2 cursor-pointer Active: scale-95 transition-transform">account_circle</span>
+</div>
+</header>
+<div class="flex flex-1 pt-16 overflow-hidden">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen py-6 px-4 gap-4 bg-surface-container-low dark:bg-inverse-surface docked h-full left-0 w-64 bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline flat no shadows z-40 fixed">
+<div class="mb-6">
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">Synthie AI</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant dark:text-on-surface-variant">Online</div>
+</div>
+<button class="bg-primary text-on-primary rounded-lg py-2 px-4 font-label-md text-label-md hover:opacity-90 transition-opacity mb-4">New Chat</button>
+<div class="flex flex-col gap-2 flex-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all duration-200 rounded-lg scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-label-md">History</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all duration-200 rounded-lg scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined">quiz</span>
+<span class="font-label-md text-label-md">FAQs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all duration-200 rounded-lg scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined">support_agent</span>
+<span class="font-label-md text-label-md">Human Agent</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-lg font-bold hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all duration-200 scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+<div class="mt-auto flex flex-col gap-2">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all duration-200 rounded-lg scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined">gavel</span>
+<span class="font-label-md text-label-md">Privacy</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all duration-200 rounded-lg scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-label-md text-label-md">Terms</span>
+</a>
+</div>
+</nav>
+<!-- Main Chat Area -->
+<main class="flex-1 ml-0 md:ml-64 flex flex-col h-[calc(100vh-4rem)] relative">
+<!-- System Error Banner (Hidden by default, shown for demo) -->
+<div class="w-full bg-error-container text-on-error-container py-2 px-4 text-center font-body-sm text-body-sm flex justify-center items-center gap-2">
+<span class="material-symbols-outlined text-sm">warning</span>
+                Network connection unstable. Some messages may fail to send.
+            </div>
+<!-- Chat Scroll Area -->
+<div class="flex-1 overflow-y-auto px-edge-margin-mobile md:px-edge-margin-desktop py-section-margin flex flex-col items-center">
+<div class="w-full max-w-container-max flex flex-col gap-stack-gap">
+<!-- Message Group 1: User -> AI Error -->
+<div class="flex flex-col gap-2 w-full">
+<!-- User Message -->
+<div class="flex justify-end w-full">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm p-bubble-padding max-w-[80%] font-body-md text-body-md shadow-sm">
+                                Can you generate a summary of the Q3 financial report?
+                            </div>
+</div>
+<!-- AI Error Message -->
+<div class="flex justify-start w-full group">
+<div class="flex gap-3 max-w-[80%]">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary text-sm">smart_toy</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="bg-error-container text-on-error-container rounded-2xl rounded-tl-sm p-bubble-padding font-body-md text-body-md border border-error/20 flex flex-col gap-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined">error</span>
+<span>Failed to generate response.</span>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="font-body-sm text-body-sm text-error">Network error - please try again</span>
+<button class="text-primary hover:bg-surface-container-low px-2 py-1 rounded font-label-md text-label-md transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">refresh</span> Retry
+                                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Message Group 2: User -> AI Streaming -->
+<div class="flex flex-col gap-2 w-full mt-4">
+<!-- User Message -->
+<div class="flex justify-end w-full">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm p-bubble-padding max-w-[80%] font-body-md text-body-md shadow-sm">
+                                Okay, let's try something simpler. What are the key takeaways from the meeting?
+                            </div>
+</div>
+<!-- AI Streaming Message -->
+<div class="flex justify-start w-full group">
+<div class="flex gap-3 max-w-[80%] w-full">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary text-sm">smart_toy</span>
+</div>
+<div class="bg-surface-container-low text-on-surface rounded-2xl rounded-tl-sm p-bubble-padding font-body-md text-body-md border border-outline-variant w-full">
+<div class="font-mono-streaming text-mono-streaming text-on-surface-variant">
+                                        Based on the meeting notes, here are the key takeaways:
+                                        <br/><br/>
+                                        1. The Q4 marketing budget has been approved with a 15% increase.
+                                        <br/>
+                                        2. Development on the new mobile app feature is on track for a November release.
+                                        <br/>
+                                        3. We need to schedule a follow-up with the design team regarding<span class="typing-cursor"></span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Input Area -->
+<div class="w-full px-edge-margin-mobile md:px-edge-margin-desktop py-4 bg-background/80 backdrop-blur-md border-t border-outline-variant flex justify-center">
+<div class="w-full max-w-container-max relative shadow-[0px_4px_20px_rgba(0,0,0,0.05)] rounded-xl bg-surface-container-lowest border border-outline-variant p-2 flex items-end gap-2">
+<button class="p-2 text-outline hover:text-primary transition-colors rounded-full hover:bg-surface-container-low flex-shrink-0">
+<span class="material-symbols-outlined">attach_file</span>
+</button>
+<textarea class="w-full bg-transparent border-none focus:ring-0 resize-none font-body-md text-body-md py-2 placeholder:text-outline-variant max-h-32" placeholder="Message Synthie AI..." rows="1"></textarea>
+<button class="p-2 bg-primary text-on-primary rounded-lg hover:bg-primary/90 transition-colors flex-shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer -->
+<footer class="bg-background dark:bg-background full-width bottom-0 border-t border-outline-variant dark:border-outline flat no shadows flex flex-col md:flex-row justify-between items-center py-4 px-edge-margin-mobile md:px-edge-margin-desktop w-full max-w-container-max mx-auto z-50 relative ml-0 md:ml-64 w-[calc(100%-16rem)]">
+<div class="font-body-sm text-body-sm text-on-surface-variant dark:text-on-surface-variant mb-2 md:mb-0">
+            © 2024 Synthie AI. All rights reserved.
+        </div>
+<div class="flex gap-4">
+<a class="font-body-sm text-body-sm text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim opacity-80 hover:opacity-100 transition-opacity" href="#">Privacy Policy</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim opacity-80 hover:opacity-100 transition-opacity" href="#">Terms of Service</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim opacity-80 hover:opacity-100 transition-opacity" href="#">Help Center</a>
+</div>
+</footer>
+<script>
+        // Simple auto-resize for textarea
+        const tx = document.getElementsByTagName("textarea");
+        for (let i = 0; i < tx.length; i++) {
+            tx[i].setAttribute("style", "height:" + (tx[i].scrollHeight) + "px;overflow-y:hidden;");
+            tx[i].addEventListener("input", OnInput, false);
+        }
+
+        function OnInput() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + "px";
+        }
+    </script>
+</body></html>
