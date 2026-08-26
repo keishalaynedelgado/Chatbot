@@ -250,11 +250,14 @@ I can assist you with:
 How can I help you today?`;
 }
 
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Fallback all other routes to index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 if (!process.env.VERCEL) {
-  app.use(express.static(path.join(__dirname, 'public')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  });
   app.listen(PORT, () => {
     console.log(`🚀 Synthie AI Server running on http://localhost:${PORT} (Vercel AI SDK Integrated)`);
   });
