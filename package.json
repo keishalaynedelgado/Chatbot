@@ -2,10 +2,15 @@
   "name": "synthie-ai-chatbot",
   "version": "1.0.0",
   "description": "Synthie AI - Fully functional AI Chatbot Application",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node tests/test_suite.js"
+  },
+  "engines": {
+    "node": ">=20.x"
   },
   "keywords": [
     "chatbot",

@@ -1,9 +1,15 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
-const { resolveModel, streamText, DEFAULT_PROVIDER, DEFAULT_MODEL, MODEL_CATALOG } = require('./server/ai-config');
+dotenv.config();
+
+import { resolveModel, streamText, DEFAULT_PROVIDER, DEFAULT_MODEL, MODEL_CATALOG } from './server/ai-config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -263,4 +269,4 @@ if (!process.env.VERCEL) {
   });
 }
 
-module.exports = app;
+export default app;

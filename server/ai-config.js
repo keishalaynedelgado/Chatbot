@@ -5,16 +5,16 @@
  * Default models and providers can be customized here or via environment variables.
  */
 
-const { createOpenAI } = require('@ai-sdk/openai');
-const { createGoogleGenerativeAI } = require('@ai-sdk/google');
-const { streamText } = require('ai');
+import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { streamText } from 'ai';
 
 // Default configurations from environment variables or sensible fallbacks
-const DEFAULT_PROVIDER = process.env.DEFAULT_AI_PROVIDER || 'nvidia';
-const DEFAULT_MODEL = process.env.DEFAULT_AI_MODEL || 'meta/llama-3.1-8b-instruct';
+export const DEFAULT_PROVIDER = process.env.DEFAULT_AI_PROVIDER || 'nvidia';
+export const DEFAULT_MODEL = process.env.DEFAULT_AI_MODEL || 'meta/llama-3.1-8b-instruct';
 
 // Available model catalog matching the original UI list
-const MODEL_CATALOG = [
+export const MODEL_CATALOG = [
   {
     id: 'meta/llama-3.1-8b-instruct',
     name: 'Meta Llama 3.1 8B Instruct (Ultra-Fast NVIDIA NIM - Active)',
@@ -68,7 +68,7 @@ const MODEL_CATALOG = [
  * @param {string} [options.apiKey] - Optional custom API key from client
  * @returns {{ modelInstance: any, resolvedProvider: string, resolvedModel: string } | null}
  */
-function resolveModel({ provider = 'auto', model, apiKey }) {
+export function resolveModel({ provider = 'auto', model, apiKey }) {
   const rawKey = (apiKey || '').trim();
 
   // Determine available keys from environment variables or parameter
@@ -109,11 +109,9 @@ function resolveModel({ provider = 'auto', model, apiKey }) {
   // Normalize provider naming
   if (targetProvider === 'gemini') targetProvider = 'google';
 
-  // 1. NVIDIA NIM
+  // 1. NVIDIA NIM (Active)
   if (targetProvider === 'nvidia' && nvidiaKey) {
-    // Route to ultra-fast sub-second model to avoid 60-80s queue delays on NVIDIA 70B cloud
     const actualNvidiaModel = 'meta/llama-3.1-8b-instruct';
-
     const nvidia = createOpenAI({
       apiKey: nvidiaKey,
       baseURL: 'https://integrate.api.nvidia.com/v1',
@@ -167,10 +165,4 @@ function resolveModel({ provider = 'auto', model, apiKey }) {
   return null;
 }
 
-module.exports = {
-  resolveModel,
-  streamText,
-  DEFAULT_PROVIDER,
-  DEFAULT_MODEL,
-  MODEL_CATALOG
-};
+export { streamText };

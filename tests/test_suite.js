@@ -1,8 +1,7 @@
 /**
  * Automated Test Suite for Synthie AI Application (Vercel AI SDK Integration)
  */
-
-const assert = require('assert');
+import assert from 'assert';
 
 async function runTests() {
   const BASE_URL = 'http://localhost:3000';
