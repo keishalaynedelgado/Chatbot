@@ -10,7 +10,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://dxvwyapqtokxenyiliwy.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_1yPDpLFJgcPu8vd6dy4l-w_xUUKwCrY';
@@ -251,12 +250,11 @@ I can assist you with:
 How can I help you today?`;
 }
 
-// Fallback all other routes to index.html
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 if (!process.env.VERCEL) {
+  app.use(express.static(path.join(__dirname, 'public')));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
   app.listen(PORT, () => {
     console.log(`🚀 Synthie AI Server running on http://localhost:${PORT} (Vercel AI SDK Integrated)`);
   });
