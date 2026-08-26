@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { resolveModel, streamText, DEFAULT_PROVIDER, DEFAULT_MODEL, MODEL_CATALOG } from './server/ai-config.js';
+import taskDbService from './server/taskdb-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,8 +100,13 @@ app.post(['/api/chat/stream', '/chat/stream'], async (req, res) => {
   };
 
   try {
-    // Enrich system prompt with live Supabase records
+    // Enrich system prompt with live Supabase records and PostgreSQL Task Management records
     let enrichedSystemPrompt = systemInstruction || 'You are Synthie AI, an intelligent, professional, and helpful enterprise AI assistant.';
+
+    // 1. Task Management PostgreSQL Database Grounding
+    enrichedSystemPrompt += `\n\n${taskDbService.formatContextForPrompt()}`;
+
+    // 2. Supabase Live Employee Database Grounding
     const employees = await fetchSupabaseEmployees();
     if (employees && employees.length > 0) {
       const summaryList = employees.map(e => 
@@ -110,11 +116,10 @@ app.post(['/api/chat/stream', '/chat/stream'], async (req, res) => {
       enrichedSystemPrompt += `\n\n### LIVE SUPABASE DATABASE CONTEXT (Table: public.employees, Total: ${employees.length} records):
 ${summaryList}
 
-INSTRUCTIONS FOR SUPABASE DATABASE QUERIES:
-- You have direct live access to the Supabase employee database above.
-- When the user asks about employees, team members, departments, salaries, compensation, locations, or specific staff members, use the exact facts and figures from this database.
-- Present answers in clean, professional Markdown tables or bulleted lists.
-- If asked about statistics (e.g. total headcount, average salary, highest paid, counts per department), compute them accurately from this data.`;
+INSTRUCTIONS FOR DATABASE QUERIES:
+- When asked about tasks, deadlines, workloads, pending tasks, or task completion rates, use the PostgreSQL Task Management data.
+- When asked about employees, departments, salaries, or company staff, use the Supabase Employee database.
+- Present answers in clean, professional Markdown tables or bulleted lists.`;
     }
 
     // Resolve model using Vercel AI SDK configuration
@@ -185,6 +190,12 @@ INSTRUCTIONS FOR SUPABASE DATABASE QUERIES:
 
 function generateBuiltinReply(prompt, employees = []) {
   const p = prompt.toLowerCase();
+
+  // Check Task Database queries first
+  const taskReply = taskDbService.generateOfflineReply(prompt);
+  if (taskReply) {
+    return taskReply;
+  }
 
   if ((p.includes('employee') || p.includes('staff') || p.includes('database') || p.includes('engineering') || p.includes('salary')) && employees.length > 0) {
     let filtered = employees;

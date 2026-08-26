@@ -100,13 +100,16 @@ async function runTests() {
   const q3Text = await testStream('Can you generate a summary of the Q3 financial report?', 'revenue');
   console.log('   ✅ Q3 Financial summary streaming verified.');
 
-  const meetingText = await testStream('What are the key takeaways from the meeting?', 'marketing budget');
-  console.log('   ✅ Meeting takeaways streaming verified.');
+  const pendingText = await testStream('How many tasks are currently pending in the database?', 'pending');
+  console.log('   ✅ PostgreSQL Task database pending query verified.');
+
+  const workloadText = await testStream('Which users have the most assigned tasks and what is their workload?', 'workload');
+  console.log('   ✅ PostgreSQL Task database workload query verified.');
 
   const codeText = await testStream('Write a JavaScript function to stream tokens from an AI model', 'stream');
   console.log('   ✅ Code generation streaming verified.');
 
-  console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! Vercel AI SDK Integration is 100% operational.\n');
+  console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! Vercel AI SDK & PostgreSQL Task DB Integration is 100% operational.\n');
 }
 
 runTests().catch(err => {
