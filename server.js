@@ -50,8 +50,8 @@ async function fetchSupabaseEmployees() {
   return employeesCache || [];
 }
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoint (supports both /api/health and /health)
+app.get(['/api/health', '/health'], (req, res) => {
   const nvidiaKey = process.env.NVIDIA_API_KEY || (process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
   res.json({
     status: 'ok',
@@ -68,7 +68,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Models and configuration endpoint
-app.get('/api/models', (req, res) => {
+app.get(['/api/models', '/models'], (req, res) => {
   res.json({
     defaultProvider: DEFAULT_PROVIDER,
     defaultModel: DEFAULT_MODEL,
@@ -77,7 +77,7 @@ app.get('/api/models', (req, res) => {
 });
 
 // Stream endpoint powered by Vercel AI SDK
-app.post('/api/chat/stream', async (req, res) => {
+app.post(['/api/chat/stream', '/chat/stream'], async (req, res) => {
   const { messages = [], provider = 'auto', apiKey, model, systemInstruction, temperature = 0.7 } = req.body;
 
   // Set SSE headers
