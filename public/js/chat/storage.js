@@ -19,7 +19,7 @@ const StorageService = {
       const defaults = {
         provider: CONFIG.DEFAULT_PROVIDER,
         model: CONFIG.DEFAULT_MODEL,
-        nvidiaKey: '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',
+        nvidiaKey: '',
         geminiKey: '',
         openaiKey: '',
         temperature: 0.7,
@@ -29,7 +29,9 @@ const StorageService = {
       };
       if (!raw) return defaults;
       const parsed = JSON.parse(raw);
-      if (!parsed.nvidiaKey) parsed.nvidiaKey = defaults.nvidiaKey;
+      if (parsed.model === 'gpt-4o-mini' && !parsed.openaiKey) {
+        parsed.model = defaults.model;
+      }
       if (parsed.model === 'gemini-2.5-flash' && !parsed.geminiKey) {
         parsed.model = defaults.model;
       }

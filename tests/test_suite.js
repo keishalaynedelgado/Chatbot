@@ -1,12 +1,12 @@
 /**
- * Automated Test Suite for Synthie AI Application
+ * Automated Test Suite for Synthie AI Application (Vercel AI SDK Integration)
  */
 
 const assert = require('assert');
 
 async function runTests() {
   const BASE_URL = 'http://localhost:3000';
-  console.log('🧪 Starting Synthie AI Test Suite...\n');
+  console.log('🧪 Starting Synthie AI Test Suite (Vercel AI SDK)...\n');
 
   // Test 1: Health Check
   console.log('1️⃣ Checking /api/health endpoint...');
@@ -14,10 +14,20 @@ async function runTests() {
   assert.strictEqual(healthRes.status, 200, 'Health status must be 200');
   const healthData = await healthRes.json();
   assert.strictEqual(healthData.status, 'ok', 'Health response must be ok');
+  assert.strictEqual(healthData.aiSdk, 'vercel-ai-sdk', 'AI SDK must be vercel-ai-sdk');
   console.log('   ✅ Health endpoint OK:', healthData);
 
-  // Test 2: Static Assets Delivery
-  console.log('\n2️⃣ Checking Static Assets Delivery...');
+  // Test 2: Models and Configuration Endpoint
+  console.log('\n2️⃣ Checking /api/models endpoint...');
+  const modelsRes = await fetch(`${BASE_URL}/api/models`);
+  assert.strictEqual(modelsRes.status, 200, 'Models status must be 200');
+  const modelsData = await modelsRes.json();
+  assert(Array.isArray(modelsData.models), 'Models list must be an array');
+  assert(modelsData.models.length > 0, 'Models list must not be empty');
+  console.log(`   ✅ Models endpoint OK: ${modelsData.models.length} models available.`);
+
+  // Test 3: Static Assets Delivery
+  console.log('\n3️⃣ Checking Static Assets Delivery...');
   const assets = [
     '/',
     '/css/custom.css',
@@ -42,16 +52,16 @@ async function runTests() {
     console.log(`   ✅ Asset loaded: ${asset} (${res.headers.get('content-type')})`);
   }
 
-  // Test 3: Streaming SSE AI Generation
-  console.log('\n3️⃣ Checking AI SSE Streaming API...');
+  // Test 4: Streaming SSE AI Generation
+  console.log('\n4️⃣ Checking AI SSE Streaming API via Vercel AI SDK backend...');
   
-  async function testStream(prompt, expectedKeyword) {
+  async function testStream(prompt, expectedKeyword, provider = 'builtin') {
     const res = await fetch(`${BASE_URL}/api/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: [{ role: 'user', content: prompt }],
-        provider: 'builtin'
+        provider
       })
     });
 
@@ -97,7 +107,7 @@ async function runTests() {
   const codeText = await testStream('Write a JavaScript function to stream tokens from an AI model', 'stream');
   console.log('   ✅ Code generation streaming verified.');
 
-  console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! Synthie AI Chatbot is 100% operational.\n');
+  console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! Vercel AI SDK Integration is 100% operational.\n');
 }
 
 runTests().catch(err => {

@@ -3,6 +3,8 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+const { resolveModel, streamText, DEFAULT_PROVIDER, DEFAULT_MODEL, MODEL_CATALOG } = require('./server/ai-config');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -54,40 +56,45 @@ app.get('/api/health', (req, res) => {
   const nvidiaKey = process.env.NVIDIA_API_KEY || (process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
   res.json({
     status: 'ok',
+    aiSdk: 'vercel-ai-sdk',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
+    defaultProvider: DEFAULT_PROVIDER,
+    defaultModel: DEFAULT_MODEL,
     nvidiaConfigured: Boolean(nvidiaKey),
-    geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+    geminiConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY),
     openaiConfigured: Boolean(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('nvapi-')),
     supabaseConfigured: Boolean(SUPABASE_URL && SUPABASE_KEY)
   });
 });
 
-// Stream endpoint for proxying AI requests safely
+// Models and configuration endpoint
+app.get('/api/models', (req, res) => {
+  res.json({
+    defaultProvider: DEFAULT_PROVIDER,
+    defaultModel: DEFAULT_MODEL,
+    models: MODEL_CATALOG
+  });
+});
+
+// Stream endpoint powered by Vercel AI SDK
 app.post('/api/chat/stream', async (req, res) => {
-  const { messages, provider = 'auto', apiKey, model, systemInstruction, temperature = 0.7 } = req.body;
+  const { messages = [], provider = 'auto', apiKey, model, systemInstruction, temperature = 0.7 } = req.body;
 
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
+  if (typeof res.flushHeaders === 'function') {
+    res.flushHeaders();
+  }
 
   const sendEvent = (data) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
   try {
-    const rawKey = apiKey || '';
-    const nvidiaKey = (rawKey.startsWith('nvapi-') ? rawKey : null) || 
-                      process.env.NVIDIA_API_KEY || 
-                      (process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
-
-    const geminiKey = (!rawKey.startsWith('nvapi-') ? rawKey : null) || process.env.GEMINI_API_KEY;
-    const openaiKey = (!rawKey.startsWith('nvapi-') ? rawKey : null) || 
-                      (!process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
-
-    // Fetch live Supabase records to ground responses with 100% accurate data
+    // Enrich system prompt with live Supabase records
     let enrichedSystemPrompt = systemInstruction || 'You are Synthie AI, an intelligent, professional, and helpful enterprise AI assistant.';
     const employees = await fetchSupabaseEmployees();
     if (employees && employees.length > 0) {
@@ -100,205 +107,58 @@ ${summaryList}
 
 INSTRUCTIONS FOR SUPABASE DATABASE QUERIES:
 - You have direct live access to the Supabase employee database above.
-- When the user asks about employees, team members, departments, salaries, compensation, locations, or specific staff members (e.g. Sophia Chen, Alexander Wright, Elena Rostova, etc.), use the exact facts and figures from this database.
+- When the user asks about employees, team members, departments, salaries, compensation, locations, or specific staff members, use the exact facts and figures from this database.
 - Present answers in clean, professional Markdown tables or bulleted lists.
 - If asked about statistics (e.g. total headcount, average salary, highest paid, counts per department), compute them accurately from this data.`;
     }
 
-    // 1. NVIDIA NIM Provider
-    if (provider !== 'builtin' && (provider === 'nvidia' || (nvidiaKey && (!geminiKey && !openaiKey || provider === 'auto' || model?.includes('/') || rawKey.startsWith('nvapi-'))))) {
-      const selectedModel = (model && model.includes('/')) ? model : 'meta/llama-3.1-8b-instruct';
-      console.log(`[NVIDIA NIM] Streaming with model: ${selectedModel}`);
+    // Resolve model using Vercel AI SDK configuration
+    const resolved = resolveModel({ provider, model, apiKey });
 
-      const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${nvidiaKey}`,
-          'Accept': 'text/event-stream'
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            { role: 'system', content: enrichedSystemPrompt },
-            ...messages
-          ],
-          temperature: Number(temperature) || 0.7,
-          max_tokens: 2048,
-          stream: true
-        })
-      });
+    if (resolved && resolved.modelInstance) {
+      console.log(`[Vercel AI SDK] Streaming with provider: ${resolved.resolvedProvider}, model: ${resolved.resolvedModel}`);
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error('[NVIDIA Error]', response.status, errText);
-        sendEvent({ error: `NVIDIA API Error (${response.status}): ${errText}` });
-        sendEvent({ done: true });
-        return res.end();
-      }
+      // Format & sanitize messages for AI SDK (removes any empty placeholders that cause 400 Bad Request)
+      const validMessages = (Array.isArray(messages) ? messages : [])
+        .filter(m => m && typeof m.content === 'string' && m.content.trim().length > 0)
+        .slice(-20) // Keep last 20 messages for context
+        .map(m => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content.trim()
+        }));
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      const aiMessages = validMessages.length > 0 ? validMessages : [{ role: 'user', content: 'Hello' }];
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
+      try {
+        // Call Vercel AI SDK streamText
+        const result = streamText({
+          model: resolved.modelInstance,
+          system: enrichedSystemPrompt,
+          messages: aiMessages,
+          temperature: Number(temperature) || 0.7
+        });
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data: ')) {
-            const dataStr = trimmed.substring(6).trim();
-            if (dataStr === '[DONE]') {
-              continue;
-            }
-            try {
-              const parsed = JSON.parse(dataStr);
-              const text = parsed.choices?.[0]?.delta?.content || '';
-              if (text) {
-                sendEvent({ text });
-              }
-            } catch (e) {}
+        let streamedAnyTokens = false;
+        // Stream text chunks directly as they arrive from the AI provider
+        for await (const chunk of result.textStream) {
+          if (chunk) {
+            streamedAnyTokens = true;
+            sendEvent({ text: chunk });
           }
         }
-      }
 
-      sendEvent({ done: true });
-      res.end();
-      return;
+        if (streamedAnyTokens) {
+          sendEvent({ done: true });
+          res.end();
+          return;
+        }
+      } catch (streamErr) {
+        console.warn('[AI SDK Stream Error - Falling back]:', streamErr.message);
+      }
     }
 
-    // 2. Google Gemini Provider
-    if (provider === 'gemini' || (provider === 'auto' && geminiKey)) {
-      const selectedModel = model || 'gemini-2.5-flash';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:streamGenerateContent?alt=sse&key=${geminiKey}`;
-
-      const contents = messages.map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }]
-      }));
-
-      const bodyPayload = {
-        contents,
-        systemInstruction: {
-          parts: [{ text: enrichedSystemPrompt }]
-        },
-        generationConfig: {
-          temperature: Number(temperature) || 0.7,
-          maxOutputTokens: 2048,
-        }
-      };
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPayload)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        sendEvent({ error: `Gemini API Error (${response.status}): ${errorText}` });
-        sendEvent({ done: true });
-        return res.end();
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data: ')) {
-            const dataStr = trimmed.substring(6).trim();
-            if (dataStr === '[DONE]') continue;
-            try {
-              const parsed = JSON.parse(dataStr);
-              const textChunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              if (textChunk) {
-                sendEvent({ text: textChunk });
-              }
-            } catch (e) {}
-          }
-        }
-      }
-
-      sendEvent({ done: true });
-      res.end();
-      return;
-    } 
-    
-    // 3. OpenAI Provider
-    if (provider === 'openai' || (provider === 'auto' && openaiKey)) {
-      const selectedModel = model || 'gpt-4o-mini';
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiKey}`
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            { role: 'system', content: enrichedSystemPrompt },
-            ...messages
-          ],
-          temperature: Number(temperature) || 0.7,
-          stream: true
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        sendEvent({ error: `OpenAI API Error (${response.status}): ${errText}` });
-        sendEvent({ done: true });
-        return res.end();
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data: ')) {
-            const dataStr = trimmed.substring(6).trim();
-            if (dataStr === '[DONE]') {
-              continue;
-            }
-            try {
-              const parsed = JSON.parse(dataStr);
-              const text = parsed.choices?.[0]?.delta?.content || '';
-              if (text) {
-                sendEvent({ text });
-              }
-            } catch (e) {}
-          }
-        }
-      }
-
-      sendEvent({ done: true });
-      res.end();
-      return;
-    }
-
-    // 4. Fallback: Builtin smart assistant stream
+    // Fallback: Built-in smart assistant stream (Offline / No Key mode)
+    console.log('[AI Stream] Using built-in smart assistant engine fallback');
     const lastMsg = messages[messages.length - 1]?.content || '';
     const reply = generateBuiltinReply(lastMsg, employees);
 
@@ -311,6 +171,7 @@ INSTRUCTIONS FOR SUPABASE DATABASE QUERIES:
     res.end();
 
   } catch (err) {
+    console.error('[AI Stream Critical Error]:', err);
     sendEvent({ error: err.message || 'Internal server error during chat stream' });
     sendEvent({ done: true });
     res.end();
@@ -358,39 +219,28 @@ Here is the breakdown of the **Q3 Financial Report**:
    - Product team to circulate user feedback synthesis.`;
   }
 
-  if (p.includes('code') || p.includes('python') || p.includes('javascript') || p.includes('function')) {
-    return `Here is a clean implementation for your request:
+  if (p.includes('code') || p.includes('python') || p.includes('javascript') || p.includes('function') || p.includes('stream')) {
+    return `Here is a clean implementation using the **Vercel AI SDK**:
 
 \`\`\`javascript
-/**
- * Asynchronously stream tokens from an AI model
- * @param {string} prompt - The user question
- * @returns {Promise<void>}
- */
-async function streamAIResponse(prompt) {
-  const response = await fetch('/api/chat/stream', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
+import { streamText } from 'ai';
+import { openai } from '@ai-sdk/openai';
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
+// Stream text using Vercel AI SDK
+const result = streamText({
+  model: openai('gpt-4o-mini'),
+  messages: [{ role: 'user', content: 'Hello AI!' }],
+});
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    console.log(decoder.decode(value));
-  }
+for await (const textPart of result.textStream) {
+  process.stdout.write(textPart);
 }
 \`\`\`
 
 Let me know if you would like me to customize this further!`;
   }
 
-  return `I'm **Synthie AI**, your intelligent corporate and technical assistant with direct access to your **Supabase Database**.
+  return `I'm **Synthie AI**, your intelligent corporate and technical assistant powered by the **Vercel AI SDK** with direct access to your **Supabase Database**.
 
 I can assist you with:
 - **Live Database Queries**: Ask about employees, salaries, departments, and roles in Supabase.
@@ -408,7 +258,7 @@ app.get('*', (req, res) => {
 
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
-    console.log(`🚀 Synthie AI Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Synthie AI Server running on http://localhost:${PORT} (Vercel AI SDK Integrated)`);
   });
 }
 

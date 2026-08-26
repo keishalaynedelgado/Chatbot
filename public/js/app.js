@@ -89,8 +89,8 @@ class SynthieApp {
 
     // 3. Trigger AI Stream
     const currentMessages = chatManager.getActiveConversation().messages
-      .filter(m => m.id !== aiPlaceholder.id)
-      .map(m => ({ role: m.role, content: m.content }));
+      .filter(m => m.id !== aiPlaceholder.id && m.content && m.content.trim().length > 0)
+      .map(m => ({ role: m.role, content: m.content.trim() }));
 
     await aiService.streamChat({
       messages: currentMessages,
