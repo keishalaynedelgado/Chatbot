@@ -6,20 +6,20 @@ const CONFIG = {
   APP_NAME: 'Synthie AI',
   VERSION: '1.0.0',
   DEFAULT_PROVIDER: 'auto', // 'auto', 'nvidia', 'gemini', 'openai', 'builtin'
-  DEFAULT_MODEL: 'meta/llama-3.1-8b-instruct',
+  DEFAULT_MODEL: 'meta/llama-3.2-11b-vision-instruct',
   
   MODELS: [
     {
-      id: 'meta/llama-3.1-8b-instruct',
-      name: 'Meta Llama 3.1 8B Instruct (Ultra-Fast NVIDIA NIM - Active)',
+      id: 'meta/llama-3.2-11b-vision-instruct',
+      name: 'Meta Llama 3.2 11B Instruct (Ultra-Fast NVIDIA NIM - Active)',
       provider: 'nvidia',
       description: 'Ultra-fast sub-second responses hosted on NVIDIA NIM.'
     },
     {
-      id: 'meta/llama-3.3-70b-instruct',
-      name: 'Meta Llama 3.3 70B Instruct (High Intelligence NVIDIA NIM)',
+      id: 'meta/llama-3.2-90b-vision-instruct',
+      name: 'Meta Llama 3.2 90B Instruct (High Intelligence NVIDIA NIM)',
       provider: 'nvidia',
-      description: 'State-of-the-art 70B reasoning model hosted on NVIDIA NIM.'
+      description: 'State-of-the-art 90B reasoning model hosted on NVIDIA NIM.'
     },
     {
       id: 'deepseek-ai/deepseek-coder-6.7b-instruct',

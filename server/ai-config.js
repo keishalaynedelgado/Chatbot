@@ -1,8 +1,6 @@
 /**
- * Vercel AI SDK - Centralized Model & Provider Configuration
- * 
- * Isolates AI model and provider resolution from UI and server routing logic.
- * Default models and providers can be customized here or via environment variables.
+ * Synthie AI - AI Provider Configuration & Model Resolver
+ * Powered by Vercel AI SDK (@ai-sdk/google, @ai-sdk/openai, ai)
  */
 
 import { createOpenAI } from '@ai-sdk/openai';
@@ -11,33 +9,21 @@ import { streamText } from 'ai';
 
 // Default configurations from environment variables or sensible fallbacks
 export const DEFAULT_PROVIDER = process.env.DEFAULT_AI_PROVIDER || 'nvidia';
-export const DEFAULT_MODEL = process.env.DEFAULT_AI_MODEL || 'meta/llama-3.1-8b-instruct';
+export const DEFAULT_MODEL = process.env.DEFAULT_AI_MODEL || 'meta/llama-3.2-11b-vision-instruct';
 
-// Available model catalog matching the original UI list
+// Available model catalog matching the UI list
 export const MODEL_CATALOG = [
   {
-    id: 'meta/llama-3.1-8b-instruct',
-    name: 'Meta Llama 3.1 8B Instruct (Ultra-Fast NVIDIA NIM - Active)',
+    id: 'meta/llama-3.2-11b-vision-instruct',
+    name: 'Meta Llama 3.2 11B Instruct (Ultra-Fast NVIDIA NIM - Active)',
     provider: 'nvidia',
     description: 'Ultra-fast sub-second responses hosted on NVIDIA NIM.'
   },
   {
-    id: 'meta/llama-3.3-70b-instruct',
-    name: 'Meta Llama 3.3 70B Instruct (High Intelligence NVIDIA NIM)',
+    id: 'meta/llama-3.2-90b-vision-instruct',
+    name: 'Meta Llama 3.2 90B Instruct (High Intelligence NVIDIA NIM)',
     provider: 'nvidia',
-    description: 'State-of-the-art 70B reasoning model hosted on NVIDIA NIM.'
-  },
-  {
-    id: 'deepseek-ai/deepseek-coder-6.7b-instruct',
-    name: 'DeepSeek Coder 6.7B (NVIDIA NIM)',
-    provider: 'nvidia',
-    description: 'Specialized code generation & technical synthesis.'
-  },
-  {
-    id: 'mistralai/mixtral-8x7b-instruct-v0.1',
-    name: 'Mixtral 8x7B (NVIDIA NIM)',
-    provider: 'nvidia',
-    description: 'High performance sparse mixture-of-experts model.'
+    description: 'State-of-the-art 90B reasoning model hosted on NVIDIA NIM.'
   },
   {
     id: 'gemini-2.5-flash',
@@ -46,72 +32,69 @@ export const MODEL_CATALOG = [
     description: 'Ultra-fast, high intelligence multimodal model from Google.'
   },
   {
+    id: 'gemini-2.5-pro',
+    name: 'Google Gemini 2.5 Pro',
+    provider: 'google',
+    description: 'Complex reasoning, analysis, and extensive context window.'
+  },
+  {
     id: 'gpt-4o-mini',
     name: 'OpenAI GPT-4o Mini',
     provider: 'openai',
-    description: 'Fast and versatile flagship mini model from OpenAI.'
+    description: 'Fast, affordable model for focused enterprise tasks.'
   },
   {
-    id: 'builtin-smart',
-    name: 'Built-in Synthie AI Engine',
-    provider: 'builtin',
-    description: 'Offline-ready smart assistant (No API key required).'
+    id: 'gpt-4o',
+    name: 'OpenAI GPT-4o',
+    provider: 'openai',
+    description: 'Flagship high-intelligence multimodal model from OpenAI.'
   }
 ];
 
 /**
- * Resolves a Vercel AI SDK language model instance based on requested provider, model, and optional apiKey.
- *
- * @param {Object} options
- * @param {string} [options.provider] - 'auto', 'nvidia', 'google', 'gemini', 'openai', 'builtin'
- * @param {string} [options.model] - Specific model identifier
- * @param {string} [options.apiKey] - Optional custom API key from client
- * @returns {{ modelInstance: any, resolvedProvider: string, resolvedModel: string } | null}
+ * Normalizes NVIDIA model name to currently active NIM endpoints
+ */
+function normalizeNvidiaModel(modelName) {
+  if (!modelName) return 'meta/llama-3.2-11b-vision-instruct';
+  if (modelName.includes('90b') || modelName.includes('70b')) {
+    return 'meta/llama-3.2-90b-vision-instruct';
+  }
+  return 'meta/llama-3.2-11b-vision-instruct';
+}
+
+/**
+ * Resolves appropriate AI model instance using Vercel AI SDK
+ * Prioritizes:
+ * 1. Explicit user request (if provider/key available)
+ * 2. NVIDIA NIM (Pre-configured active key)
+ * 3. Google Gemini (if key configured)
+ * 4. OpenAI (if key configured)
  */
 export function resolveModel({ provider = 'auto', model, apiKey }) {
-  const rawKey = (apiKey || '').trim();
-
-  // Determine available keys from environment variables or parameter
   const envNvidiaKey = process.env.NVIDIA_API_KEY || (process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
-  const envGeminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || null;
-  const envOpenaiKey = (!process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
-
-  const nvidiaKey = (rawKey.startsWith('nvapi-') ? rawKey : null) || envNvidiaKey;
-  const geminiKey = (!rawKey.startsWith('nvapi-') && (rawKey.startsWith('AIza') || provider === 'gemini' || provider === 'google') ? rawKey : null) || envGeminiKey;
-  const openaiKey = (!rawKey.startsWith('nvapi-') && !rawKey.startsWith('AIza') && (rawKey.startsWith('sk-') || provider === 'openai') ? rawKey : null) || envOpenaiKey;
+  const nvidiaKey = (apiKey?.startsWith('nvapi-') ? apiKey : null) || envNvidiaKey;
+  const geminiKey = (apiKey?.startsWith('AIza') ? apiKey : null) || process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  const openaiKey = (apiKey?.startsWith('sk-') ? apiKey : null) || (process.env.OPENAI_API_KEY?.startsWith('sk-') ? process.env.OPENAI_API_KEY : null);
 
   let targetProvider = provider;
   let targetModel = model;
 
-  if (targetProvider === 'builtin' || targetModel === 'builtin-smart') {
-    return null; // Will trigger built-in generator
-  }
-
-  // Auto-detect provider based on requested model or available credentials
-  if (!targetProvider || targetProvider === 'auto') {
-    if (targetModel && targetModel.includes('/')) {
-      targetProvider = 'nvidia';
-    } else if (targetModel && targetModel.startsWith('gemini') && geminiKey) {
+  // Auto-detect provider if auto or model specifies it
+  if (targetProvider === 'auto' || !targetProvider) {
+    if (apiKey?.startsWith('AIza') || (targetModel && targetModel.startsWith('gemini'))) {
       targetProvider = 'google';
-    } else if (targetModel && (targetModel.startsWith('gpt') || targetModel.startsWith('o1')) && openaiKey) {
+    } else if (apiKey?.startsWith('sk-') || (targetModel && targetModel.startsWith('gpt'))) {
       targetProvider = 'openai';
-    } else if (nvidiaKey) {
+    } else if (apiKey?.startsWith('nvapi-') || (targetModel && (targetModel.includes('llama') || targetModel.includes('mistral') || targetModel.includes('deepseek')))) {
       targetProvider = 'nvidia';
-    } else if (geminiKey) {
-      targetProvider = 'google';
-    } else if (openaiKey) {
-      targetProvider = 'openai';
     } else {
       targetProvider = DEFAULT_PROVIDER;
     }
   }
 
-  // Normalize provider naming
-  if (targetProvider === 'gemini') targetProvider = 'google';
-
   // 1. NVIDIA NIM (Active)
   if (targetProvider === 'nvidia' && nvidiaKey) {
-    const actualNvidiaModel = 'meta/llama-3.1-8b-instruct';
+    const activeNvidiaModel = normalizeNvidiaModel(targetModel);
     const nvidia = createOpenAI({
       apiKey: nvidiaKey,
       baseURL: 'https://integrate.api.nvidia.com/v1',
@@ -119,9 +102,9 @@ export function resolveModel({ provider = 'auto', model, apiKey }) {
     });
 
     return {
-      modelInstance: nvidia.chat(actualNvidiaModel),
+      modelInstance: nvidia.chat(activeNvidiaModel),
       resolvedProvider: 'nvidia',
-      resolvedModel: targetModel || actualNvidiaModel
+      resolvedModel: activeNvidiaModel
     };
   }
 
@@ -149,16 +132,16 @@ export function resolveModel({ provider = 'auto', model, apiKey }) {
 
   // 4. Default to active NVIDIA NIM model
   if (nvidiaKey) {
-    const activeModel = 'meta/llama-3.1-8b-instruct';
+    const defaultNvidiaModel = 'meta/llama-3.2-11b-vision-instruct';
     const nvidia = createOpenAI({
       apiKey: nvidiaKey,
       baseURL: 'https://integrate.api.nvidia.com/v1',
       compatibility: 'compatible'
     });
     return {
-      modelInstance: nvidia.chat(activeModel),
+      modelInstance: nvidia.chat(defaultNvidiaModel),
       resolvedProvider: 'nvidia',
-      resolvedModel: activeModel
+      resolvedModel: defaultNvidiaModel
     };
   }
 

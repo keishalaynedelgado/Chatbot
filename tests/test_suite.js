@@ -103,6 +103,15 @@ async function runTests() {
   const pendingText = await testStream('How many tasks are currently pending in the database?', 'pending');
   console.log('   ✅ PostgreSQL Task database pending query verified.');
 
+  const overdueText = await testStream('What tasks are overdue?', 'overdue');
+  console.log('   ✅ PostgreSQL Task database overdue query verified.');
+
+  const priorityText = await testStream('Which tasks have the highest priority?', 'priority');
+  console.log('   ✅ PostgreSQL Task database priority query verified.');
+
+  const statusText = await testStream('What is the status of my tasks?', 'task');
+  console.log('   ✅ PostgreSQL Task database status query verified.');
+
   const workloadText = await testStream('Which users have the most assigned tasks and what is their workload?', 'workload');
   console.log('   ✅ PostgreSQL Task database workload query verified.');
 

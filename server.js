@@ -8,6 +8,7 @@ dotenv.config();
 
 import { resolveModel, streamText, DEFAULT_PROVIDER, DEFAULT_MODEL, MODEL_CATALOG } from './server/ai-config.js';
 import taskDbService from './server/taskdb-service.js';
+import { testConnection } from './server/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,8 +59,9 @@ async function fetchSupabaseEmployees() {
 }
 
 // Health check endpoint (supports both /api/health and /health)
-app.get(['/api/health', '/health'], (req, res) => {
+app.get(['/api/health', '/health'], async (req, res) => {
   const nvidiaKey = process.env.NVIDIA_API_KEY || (process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
+  const isPostgresConnected = await testConnection();
   res.json({
     status: 'ok',
     aiSdk: 'vercel-ai-sdk',
@@ -67,6 +69,7 @@ app.get(['/api/health', '/health'], (req, res) => {
     timestamp: new Date().toISOString(),
     defaultProvider: DEFAULT_PROVIDER,
     defaultModel: DEFAULT_MODEL,
+    postgresConfigured: isPostgresConnected,
     nvidiaConfigured: Boolean(nvidiaKey),
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY),
     openaiConfigured: Boolean(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('nvapi-')),
@@ -103,8 +106,9 @@ app.post(['/api/chat/stream', '/chat/stream'], async (req, res) => {
     // Enrich system prompt with live Supabase records and PostgreSQL Task Management records
     let enrichedSystemPrompt = systemInstruction || 'You are Synthie AI, an intelligent, professional, and helpful enterprise AI assistant.';
 
-    // 1. Task Management PostgreSQL Database Grounding
-    enrichedSystemPrompt += `\n\n${taskDbService.formatContextForPrompt()}`;
+    // 1. Task Management PostgreSQL Database Grounding (Live Query)
+    const taskContext = await taskDbService.formatContextForPrompt();
+    enrichedSystemPrompt += `\n\n${taskContext}`;
 
     // 2. Supabase Live Employee Database Grounding
     const employees = await fetchSupabaseEmployees();
@@ -117,7 +121,7 @@ app.post(['/api/chat/stream', '/chat/stream'], async (req, res) => {
 ${summaryList}
 
 INSTRUCTIONS FOR DATABASE QUERIES:
-- When asked about tasks, deadlines, workloads, pending tasks, or task completion rates, use the PostgreSQL Task Management data.
+- When asked about tasks, deadlines, workloads, pending tasks, or task completion rates, use the live PostgreSQL Task Management data.
 - When asked about employees, departments, salaries, or company staff, use the Supabase Employee database.
 - Present answers in clean, professional Markdown tables or bulleted lists.`;
     }
@@ -170,7 +174,7 @@ INSTRUCTIONS FOR DATABASE QUERIES:
     // Fallback: Built-in smart assistant stream (Offline / No Key mode)
     console.log('[AI Stream] Using built-in smart assistant engine fallback');
     const lastMsg = messages[messages.length - 1]?.content || '';
-    const reply = generateBuiltinReply(lastMsg, employees);
+    const reply = await generateBuiltinReply(lastMsg, employees);
 
     const tokens = reply.match(/(\S+\s*|\n+)/g) || [reply];
     for (const token of tokens) {
@@ -188,11 +192,11 @@ INSTRUCTIONS FOR DATABASE QUERIES:
   }
 });
 
-function generateBuiltinReply(prompt, employees = []) {
+async function generateBuiltinReply(prompt, employees = []) {
   const p = prompt.toLowerCase();
 
-  // Check Task Database queries first
-  const taskReply = taskDbService.generateOfflineReply(prompt);
+  // Check Task Database queries first (queries live PostgreSQL)
+  const taskReply = await taskDbService.generateOfflineReply(prompt);
   if (taskReply) {
     return taskReply;
   }
