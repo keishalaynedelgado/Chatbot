@@ -7,7 +7,7 @@ const CONFIG = {
   VERSION: '1.0.0',
   DEFAULT_PROVIDER: 'auto', // 'auto', 'nvidia', 'gemini', 'openai', 'builtin'
   DEFAULT_MODEL: 'meta/llama-3.2-11b-vision-instruct',
-  
+
   MODELS: [
     {
       id: 'meta/llama-3.2-11b-vision-instruct',

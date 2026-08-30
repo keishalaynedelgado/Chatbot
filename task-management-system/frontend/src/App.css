@@ -1,0 +1,51 @@
+/* frontend/src/App.css */
+@layer components {
+  .app-container {
+    @apply min-h-screen bg-gray-50 dark:bg-gray-900;
+  }
+
+  /* Transition for theme changes */
+  * {
+    @apply transition-colors duration-200;
+  }
+
+  /* Better focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2;
+  }
+
+  /* Form group spacing */
+  .form-group {
+    @apply space-y-2;
+  }
+
+  /* Page header */
+  .page-header {
+    @apply flex flex-col gap-4 md:flex-row md:items-center md:justify-between;
+  }
+
+  .page-title {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .page-description {
+    @apply text-muted-foreground;
+  }
+
+  /* Empty state */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-center;
+  }
+
+  .empty-state-icon {
+    @apply h-16 w-16 text-muted-foreground/50 mb-4;
+  }
+
+  .empty-state-title {
+    @apply text-xl font-semibold text-foreground;
+  }
+
+  .empty-state-description {
+    @apply text-muted-foreground mt-1;
+  }
+}
