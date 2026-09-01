@@ -19,6 +19,7 @@ const StorageService = {
       const defaults = {
         provider: CONFIG.DEFAULT_PROVIDER,
         model: CONFIG.DEFAULT_MODEL,
+        scxKey: 'sk-scx-926783afc408abe78ad48381029a8360',
         nvidiaKey: '',
         geminiKey: '',
         openaiKey: '',

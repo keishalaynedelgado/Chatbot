@@ -68,6 +68,21 @@ const Modals = {
               <p class="text-xs text-on-surface-variant mt-1">Select the AI intelligence engine.</p>
             </div>
 
+            <!-- SCX AI (MiniMax) API Key -->
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <label class="font-label-md text-label-md font-semibold text-on-surface">SCX AI API Key</label>
+                <span class="text-[11px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">MiniMax Active</span>
+              </div>
+              <div class="relative">
+                <input type="password" id="settings-scx-key" value="${Helpers.escapeHtml(settings.scxKey || '')}" placeholder="sk-scx-..." class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 pr-10 text-body-md text-on-surface focus:outline-none focus:border-primary font-mono text-xs" />
+                <button type="button" onclick="Modals.togglePassword('settings-scx-key', this)" class="absolute right-2 top-2.5 text-outline hover:text-primary">
+                  <span class="material-symbols-outlined text-[18px]">visibility</span>
+                </button>
+              </div>
+              <p class="text-xs text-on-surface-variant mt-1">Powers MiniMax-M2.7 intelligence model via SCX AI.</p>
+            </div>
+
             <!-- NVIDIA NIM API Key -->
             <div>
               <div class="flex justify-between items-center mb-1">
@@ -172,6 +187,7 @@ const Modals = {
    */
   saveSettings() {
     const model = document.getElementById('settings-model')?.value;
+    const scxKey = document.getElementById('settings-scx-key')?.value.trim();
     const nvidiaKey = document.getElementById('settings-nvidia-key')?.value.trim();
     const geminiKey = document.getElementById('settings-gemini-key')?.value.trim();
     const openaiKey = document.getElementById('settings-openai-key')?.value.trim();
@@ -180,6 +196,7 @@ const Modals = {
 
     StorageService.saveSettings({
       model,
+      scxKey,
       nvidiaKey,
       geminiKey,
       openaiKey,
@@ -197,6 +214,7 @@ const Modals = {
   resetSettings() {
     StorageService.saveSettings({
       model: CONFIG.DEFAULT_MODEL,
+      scxKey: 'sk-scx-926783afc408abe78ad48381029a8360',
       nvidiaKey: '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',
       geminiKey: '',
       openaiKey: '',

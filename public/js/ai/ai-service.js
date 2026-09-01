@@ -37,13 +37,23 @@ class AIService {
     const settings = StorageService.getSettings();
     const model = settings.model || CONFIG.DEFAULT_MODEL;
     const provider = settings.provider || 'auto';
+    const scxKey = settings.scxKey || '';
     const nvidiaKey = settings.nvidiaKey || '';
     const geminiKey = settings.geminiKey || '';
     const openaiKey = settings.openaiKey || '';
     const systemPrompt = settings.systemPrompt || CONFIG.DEFAULT_SYSTEM_PROMPT;
     const temperature = settings.temperature || 0.7;
 
-    const apiKey = nvidiaKey || geminiKey || openaiKey;
+    let apiKey = '';
+    if (model === 'MiniMax-M2.7' || provider === 'scx') {
+      apiKey = scxKey;
+    } else if (model.startsWith('gemini') || provider === 'google') {
+      apiKey = geminiKey;
+    } else if (model.startsWith('gpt') || provider === 'openai') {
+      apiKey = openaiKey;
+    } else {
+      apiKey = nvidiaKey || scxKey || geminiKey || openaiKey;
+    }
 
     try {
       // 1. Direct Builtin selection

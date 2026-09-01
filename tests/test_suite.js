@@ -4,7 +4,7 @@
 import assert from 'assert';
 
 async function runTests() {
-  const BASE_URL = 'http://localhost:3000';
+  const BASE_URL = process.env.TEST_URL || 'http://127.0.0.1:3000';
   console.log('🧪 Starting Synthie AI Test Suite (Vercel AI SDK)...\n');
 
   // Test 1: Health Check
@@ -118,7 +118,47 @@ async function runTests() {
   const codeText = await testStream('Write a JavaScript function to stream tokens from an AI model', 'stream');
   console.log('   ✅ Code generation streaming verified.');
 
-  console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! Vercel AI SDK & PostgreSQL Task DB Integration is 100% operational.\n');
+  // Test 5: SCX MiniMax-M2.7 Live Streaming
+  console.log('\n5️⃣ Checking SCX MiniMax-M2.7 live streaming via Vercel AI SDK...');
+  const scxRes = await fetch(`${BASE_URL}/api/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: 'Say SCX Connection Verified' }],
+      provider: 'scx',
+      model: 'MiniMax-M2.7',
+      apiKey: 'sk-scx-926783afc408abe78ad48381029a8360'
+    })
+  });
+  assert.strictEqual(scxRes.status, 200, 'SCX stream must return 200 OK');
+  assert(scxRes.headers.get('content-type').includes('text/event-stream'));
+
+  const scxReader = scxRes.body.getReader();
+  const scxDecoder = new TextDecoder('utf-8');
+  let scxBuffer = '';
+  let scxText = '';
+  while (true) {
+    const { done, value } = await scxReader.read();
+    if (done) break;
+    scxBuffer += scxDecoder.decode(value, { stream: true });
+    const lines = scxBuffer.split('\n');
+    scxBuffer = lines.pop();
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('data: ')) {
+        const dataStr = trimmed.substring(6).trim();
+        if (!dataStr) continue;
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.text) scxText += parsed.text;
+        } catch (e) {}
+      }
+    }
+  }
+  assert(scxText.length > 0, 'SCX MiniMax-M2.7 must return streamed content');
+  console.log(`   ✅ SCX MiniMax-M2.7 output received (${scxText.trim().substring(0, 50)}...)`);
+
+  console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! Vercel AI SDK, SCX MiniMax-M2.7 & PostgreSQL Task DB Integration is 100% operational.\n');
 }
 
 runTests().catch(err => {

@@ -14,6 +14,12 @@ export const DEFAULT_MODEL = process.env.DEFAULT_AI_MODEL || 'meta/llama-3.2-11b
 // Available model catalog matching the UI list
 export const MODEL_CATALOG = [
   {
+    id: 'MiniMax-M2.7',
+    name: 'MiniMax M2.7 (SCX AI - High Intelligence)',
+    provider: 'scx',
+    description: 'High intelligence reasoning and conversational model hosted on SCX AI.'
+  },
+  {
     id: 'meta/llama-3.2-11b-vision-instruct',
     name: 'Meta Llama 3.2 11B Instruct (Ultra-Fast NVIDIA NIM - Active)',
     provider: 'nvidia',
@@ -65,34 +71,67 @@ function normalizeNvidiaModel(modelName) {
 /**
  * Resolves appropriate AI model instance using Vercel AI SDK
  * Prioritizes:
- * 1. Explicit user request (if provider/key available)
+ * 1. SCX AI (if SCX key or model requested)
  * 2. NVIDIA NIM (Pre-configured active key)
  * 3. Google Gemini (if key configured)
  * 4. OpenAI (if key configured)
  */
 export function resolveModel({ provider = 'auto', model, apiKey }) {
+  const scxKey = (apiKey?.startsWith('sk-scx-') ? apiKey : null) || process.env.SCX_API_KEY;
   const envNvidiaKey = process.env.NVIDIA_API_KEY || (process.env.OPENAI_API_KEY?.startsWith('nvapi-') ? process.env.OPENAI_API_KEY : null);
   const nvidiaKey = (apiKey?.startsWith('nvapi-') ? apiKey : null) || envNvidiaKey;
   const geminiKey = (apiKey?.startsWith('AIza') ? apiKey : null) || process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  const openaiKey = (apiKey?.startsWith('sk-') ? apiKey : null) || (process.env.OPENAI_API_KEY?.startsWith('sk-') ? process.env.OPENAI_API_KEY : null);
+  const openaiKey = (apiKey?.startsWith('sk-') && !apiKey?.startsWith('sk-scx-') ? apiKey : null) || (process.env.OPENAI_API_KEY?.startsWith('sk-') && !process.env.OPENAI_API_KEY?.startsWith('sk-scx-') ? process.env.OPENAI_API_KEY : null);
+
+  if (provider === 'builtin' || model === 'builtin-smart') {
+    return null;
+  }
 
   let targetProvider = provider;
   let targetModel = model;
 
   // Auto-detect provider if auto or model specifies it
   if (targetProvider === 'auto' || !targetProvider) {
-    if (apiKey?.startsWith('AIza') || (targetModel && targetModel.startsWith('gemini'))) {
-      targetProvider = 'google';
-    } else if (apiKey?.startsWith('sk-') || (targetModel && targetModel.startsWith('gpt'))) {
-      targetProvider = 'openai';
-    } else if (apiKey?.startsWith('nvapi-') || (targetModel && (targetModel.includes('llama') || targetModel.includes('mistral') || targetModel.includes('deepseek')))) {
+    if (targetModel === 'MiniMax-M2.7' || (targetModel && targetModel.toLowerCase().includes('minimax'))) {
+      targetProvider = 'scx';
+    } else if (targetModel && (targetModel.includes('llama') || targetModel.includes('mistral') || targetModel.includes('deepseek'))) {
       targetProvider = 'nvidia';
+    } else if (targetModel && targetModel.startsWith('gemini')) {
+      targetProvider = 'google';
+    } else if (targetModel && targetModel.startsWith('gpt')) {
+      targetProvider = 'openai';
+    } else if (apiKey?.startsWith('sk-scx-')) {
+      targetProvider = 'scx';
+    } else if (apiKey?.startsWith('AIza')) {
+      targetProvider = 'google';
+    } else if (apiKey?.startsWith('sk-') && !apiKey?.startsWith('sk-scx-')) {
+      targetProvider = 'openai';
+    } else if (apiKey?.startsWith('nvapi-')) {
+      targetProvider = 'nvidia';
+    } else if (DEFAULT_PROVIDER === 'scx' && scxKey) {
+      targetProvider = 'scx';
     } else {
       targetProvider = DEFAULT_PROVIDER;
     }
   }
 
-  // 1. NVIDIA NIM (Active)
+  // 1. SCX AI (MiniMax-M2.7)
+  if (targetProvider === 'scx' && scxKey) {
+    const selectedModel = targetModel || 'MiniMax-M2.7';
+    const scx = createOpenAI({
+      apiKey: scxKey,
+      baseURL: 'https://api.scx.ai/v1',
+      compatibility: 'compatible'
+    });
+
+    return {
+      modelInstance: scx.chat(selectedModel),
+      resolvedProvider: 'scx',
+      resolvedModel: selectedModel
+    };
+  }
+
+  // 2. NVIDIA NIM (Active)
   if (targetProvider === 'nvidia' && nvidiaKey) {
     const activeNvidiaModel = normalizeNvidiaModel(targetModel);
     const nvidia = createOpenAI({
@@ -108,7 +147,7 @@ export function resolveModel({ provider = 'auto', model, apiKey }) {
     };
   }
 
-  // 2. Google Gemini (if key available)
+  // 3. Google Gemini (if key available)
   if (targetProvider === 'google' && geminiKey) {
     const selectedModel = (targetModel && targetModel.startsWith('gemini')) ? targetModel : 'gemini-2.5-flash';
     const google = createGoogleGenerativeAI({ apiKey: geminiKey });
@@ -119,7 +158,7 @@ export function resolveModel({ provider = 'auto', model, apiKey }) {
     };
   }
 
-  // 3. OpenAI (if key available)
+  // 4. OpenAI (if key available)
   if (targetProvider === 'openai' && openaiKey) {
     const selectedModel = (targetModel && targetModel.startsWith('gpt')) ? targetModel : 'gpt-4o-mini';
     const openai = createOpenAI({ apiKey: openaiKey });
@@ -130,7 +169,20 @@ export function resolveModel({ provider = 'auto', model, apiKey }) {
     };
   }
 
-  // 4. Default to active NVIDIA NIM model
+  // 5. Default fallback to SCX if configured, or NVIDIA NIM model
+  if (scxKey && (targetModel === 'MiniMax-M2.7' || DEFAULT_PROVIDER === 'scx')) {
+    const scx = createOpenAI({
+      apiKey: scxKey,
+      baseURL: 'https://api.scx.ai/v1',
+      compatibility: 'compatible'
+    });
+    return {
+      modelInstance: scx.chat('MiniMax-M2.7'),
+      resolvedProvider: 'scx',
+      resolvedModel: 'MiniMax-M2.7'
+    };
+  }
+
   if (nvidiaKey) {
     const defaultNvidiaModel = 'meta/llama-3.2-11b-vision-instruct';
     const nvidia = createOpenAI({

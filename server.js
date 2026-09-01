@@ -70,9 +70,10 @@ app.get(['/api/health', '/health'], async (req, res) => {
     defaultProvider: DEFAULT_PROVIDER,
     defaultModel: DEFAULT_MODEL,
     postgresConfigured: isPostgresConnected,
+    scxConfigured: Boolean(process.env.SCX_API_KEY),
     nvidiaConfigured: Boolean(nvidiaKey),
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY),
-    openaiConfigured: Boolean(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('nvapi-')),
+    openaiConfigured: Boolean(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('nvapi-') && !process.env.OPENAI_API_KEY.startsWith('sk-scx-')),
     supabaseConfigured: Boolean(SUPABASE_URL && SUPABASE_KEY)
   });
 });
@@ -89,7 +90,7 @@ app.get(['/api/models', '/models'], (req, res) => {
 // Stream endpoint powered by Vercel AI SDK
 app.post(['/api/chat/stream', '/chat/stream'], async (req, res) => {
   const { messages = [], provider = 'auto', apiKey, model, systemInstruction, temperature = 0.7 } = req.body;
-
+  console.log('bading', req.body)
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -104,7 +105,16 @@ app.post(['/api/chat/stream', '/chat/stream'], async (req, res) => {
 
   try {
     // Enrich system prompt with live Supabase records and PostgreSQL Task Management records
-    let enrichedSystemPrompt = systemInstruction || 'You are Synthie AI, an intelligent, professional, and helpful enterprise AI assistant.';
+    let enrichedSystemPrompt = systemInstruction || `You are Synthie AI, an intelligent corporate and technical assistant with access to the organization's connected databases, knowledge sources, and available tools.
+Primary Objective:
+Your highest priority is to answer the user's latest request accurately, directly, and naturally. Never replace an answer with an introduction, welcome message, or capability list.
+Core Behavior:
+- Answer the user's question first.
+- Respond naturally to greetings and casual conversation.
+- Answer general knowledge questions accurately.
+- Provide clear explanations for technical questions.
+- Maintain context throughout the conversation.
+- Forbidden: Never start every response with "I'm Synthie AI...", never repeat capabilities unless asked.`;
 
     // 1. Task Management PostgreSQL Database Grounding (Live Query)
     const taskContext = await taskDbService.formatContextForPrompt();
@@ -113,7 +123,7 @@ app.post(['/api/chat/stream', '/chat/stream'], async (req, res) => {
     // 2. Supabase Live Employee Database Grounding
     const employees = await fetchSupabaseEmployees();
     if (employees && employees.length > 0) {
-      const summaryList = employees.map(e => 
+      const summaryList = employees.map(e =>
         `- ${e.first_name} ${e.last_name} | Role: ${e.position} | Dept: ${e.department} | Salary: $${Number(e.salary).toLocaleString()} | Location: ${e.location} | Status: ${e.status} | Email: ${e.email}`
       ).join('\n');
 
@@ -260,15 +270,19 @@ for await (const textPart of result.textStream) {
 Let me know if you would like me to customize this further!`;
   }
 
-  return `I'm **Synthie AI**, your intelligent corporate and technical assistant powered by the **Vercel AI SDK** with direct access to your **Supabase Database**.
+  if (p === 'hi' || p === 'hello' || p === 'hey' || p.startsWith('hi ') || p.startsWith('hello ') || p.startsWith('hey ')) {
+    return `Hi! How can I help you today?`;
+  }
 
-I can assist you with:
-- **Live Database Queries**: Ask about employees, salaries, departments, and roles in Supabase.
-- **Financial & Data Analysis**: Summarizing reports, quarterly trends, and KPIs.
-- **Meeting Synthesis**: Extracting action items and key decisions.
-- **Code & Architecture**: Designing clean software components and debugging issues.
+  if (p.includes('what is 2 + 2') || p === '2+2' || p === '2 + 2') {
+    return `4`;
+  }
 
-How can I help you today?`;
+  if (p.includes('what can you do') || p.includes('your capabilities') || p.includes('who are you') || p.includes('what are you')) {
+    return `I am **Synthie AI**, an intelligent corporate and technical assistant with access to connected databases (Supabase employee records and PostgreSQL task management), technical problem solving, software engineering, and data analysis.\n\nHow can I assist you?`;
+  }
+
+  return `How can I assist you with that? Let me know the specific questions or details you'd like to explore.`;
 }
 
 app.use(express.static(path.join(__dirname, 'public')));

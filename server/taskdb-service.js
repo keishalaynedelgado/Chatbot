@@ -361,7 +361,7 @@ STRICT ACCURACY RULES:
                           p.includes('focus') || p.includes('problem') || p.includes('recommend') || 
                           p.includes('doing') || p.includes('summary');
 
-    if (!isTaskContext) {
+    if (!isTaskContext || p.includes('q3') || p.includes('financial') || p.includes('employee') || p.includes('staff')) {
       return null;
     }
 

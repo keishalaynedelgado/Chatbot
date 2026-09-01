@@ -11,7 +11,9 @@ const OpenAIClient = {
       throw new Error('OpenAI API key is required. Please set it in Settings or use Built-in Engine.');
     }
 
-    const endpoint = 'https://api.openai.com/v1/chat/completions';
+    const endpoint = (apiKey.startsWith('sk-scx-') || model.toLowerCase().includes('minimax'))
+      ? 'https://api.scx.ai/v1/chat/completions'
+      : 'https://api.openai.com/v1/chat/completions';
 
     const formattedMessages = [
       ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),

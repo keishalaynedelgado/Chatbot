@@ -15,6 +15,3 @@ yarn-error.log*
 # OS generated files
 .DS_Store
 Thumbs.db
-
-# Cloned reference repositories
-task-management-system/
