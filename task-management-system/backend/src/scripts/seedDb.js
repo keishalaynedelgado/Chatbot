@@ -1,1 +1,0 @@
-const seedDatabase = require('../../scripts/seedDb');

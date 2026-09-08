@@ -2,12 +2,13 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.js",
+      "src": "backend/server.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
-          "public/**",
-          "server/**"
+          "frontend/dist/**",
+          "frontend/public/**",
+          "backend/src/**"
         ]
       }
     }
@@ -15,7 +16,7 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/server.js"
+      "dest": "/backend/server.js"
     }
   ]
 }

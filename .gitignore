@@ -18,3 +18,14 @@ Thumbs.db
 
 # Cloned reference repositories
 task-management-system/
+
+# Generated documents (AI Template Autofill output)
+backend/generated-files/*
+!backend/generated-files/.gitkeep
+
+# User-uploaded knowledge-base documents (may contain confidential content)
+backend/uploaded-documents/*
+!backend/uploaded-documents/.gitkeep
+
+# Frontend production build output (reproducible via `npm run build`)
+frontend/dist/
